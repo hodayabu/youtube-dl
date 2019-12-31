@@ -300,10 +300,51 @@ class VKIE(VKBaseIE):
             'only_matching': True,
         }]
 
+    ERRORS = {
+        r'Видеозапись .*? была изъята из публичного доступа в связи с обращением правообладателя.<':
+            'Video %s has been removed from public access due to rightholder complaint.',
+
+        r'The video .*? was removed from public access by request of the copyright holder.<':
+            'Video %s has been removed from public access due to rightholder complaint.',
+
+        r'Please log in or <':
+            'Video %s is only available for registered users, '
+            'use --username and --password options to provide account credentials.',
+
+        r'Unknown error':
+            'Video %s does not exist.',
+
+        r'Видео временно недоступно':
+            'Video %s is temporarily unavailable.',
+
+        r'Access denied':
+            'Access denied to video %s.',
+
+        r'You need to be a member':
+            'Access denied to video %s.',
+
+        r'Видеозапись недоступна, так как её автор был заблокирован.':
+            'Video %s is no longer available, because its author has been blocked.',
+
+        r'This video is no longer available, because its author has been blocked.':
+            'Video %s is no longer available, because its author has been blocked.',
+
+        r'This video is no longer available, because it has been deleted.':
+            'Video %s is no longer available, because it has been deleted.',
+
+        r'The video .+? is not available in your region.':
+            'Video %s is not available in your region.',
+    }
+
     def _real_extract(self, url):
         mobj = re.match(self._VALID_URL, url)
         video_id = mobj.group('videoid')
-
+        url_page = self._download_webpage(url, url)
+        for error_re, error_msg in self.ERRORS.items():
+            for page in [url_page]:
+                if re.search(error_re, page):
+                    raise ExtractorError(error_msg % video_id, expected=True)
+                
         mv_data = {}
         if video_id:
             data = {
@@ -322,10 +363,9 @@ class VKIE(VKBaseIE):
             player = opts.get('player') or {}
         else:
             video_id = '%s_%s' % (mobj.group('oid'), mobj.group('id'))
-
             info_page = self._download_webpage(
                 'http://vk.com/video_ext.php?' + mobj.group('embed_query'), video_id)
-            url_page = self._download_webpage(url, video_id)
+
             error_message = self._html_search_regex(
                 [r'(?s)<!><div[^>]+class="video_layer_message"[^>]*>(.+?)</div>',
                     r'(?s)<div[^>]+id="video_ext_msg"[^>]*>(.+?)</div>'],
@@ -338,46 +378,8 @@ class VKIE(VKBaseIE):
                     'You are trying to log in from an unusual location. You should confirm ownership at vk.com to log in with this IP.',
                     expected=True)
 
-            ERROR_COPYRIGHT = 'Video %s has been removed from public access due to rightholder complaint.'
-
-            ERRORS = {
-                r'Видеозапись .*? была изъята из публичного доступа в связи с обращением правообладателя.<':
-                ERROR_COPYRIGHT,
-
-                r'The video .*? was removed from public access by request of the copyright holder.<':
-                ERROR_COPYRIGHT,
-
-                r'Please log in or <':
-                'Video %s is only available for registered users, '
-                'use --username and --password options to provide account credentials.',
-
-                r'Unknown error':
-                'Video %s does not exist.',
-
-                r'Видео временно недоступно':
-                'Video %s is temporarily unavailable.',
-
-                r'Access denied':
-                'Access denied to video %s.',
-
-                r'You need to be a member':
-                    'Access denied to video %s.',
-
-                r'Видеозапись недоступна, так как её автор был заблокирован.':
-                'Video %s is no longer available, because its author has been blocked.',
-
-                r'This video is no longer available, because its author has been blocked.':
-                'Video %s is no longer available, because its author has been blocked.',
-
-                r'This video is no longer available, because it has been deleted.':
-                'Video %s is no longer available, because it has been deleted.',
-
-                r'The video .+? is not available in your region.':
-                'Video %s is not available in your region.',
-            }
-
-            for error_re, error_msg in ERRORS.items():
-                for page in [info_page, url_page]:
+            for error_re, error_msg in self.ERRORS.items():
+                for page in [info_page]:
                     if re.search(error_re, page):
                         raise ExtractorError(error_msg % video_id, expected=True)
 
